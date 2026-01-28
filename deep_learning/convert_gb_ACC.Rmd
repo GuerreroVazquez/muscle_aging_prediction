@@ -1,0 +1,218 @@
+---
+title: "GB_ACC to Ensembl"
+author: "Karen"
+date: "2024-02-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("org.Hs.eg.db")
+```
+
+## R Markdown
+```{r}
+library(org.Hs.eg.db)
+get("AF414429", revmap(org.Hs.egACCNUM))
+```
+```{r}
+library("AnnotationDbi")
+
+```
+
+
+```{r}
+get("AF414429", revmap(org.Hs.egACCNUM))
+
+```
+
+```{r}
+
+```
+
+
+```{r}
+mapIds(org.Hs.eg.db, keys = c('1'), keytype = "ENTREZID", column = "ENSEMBL", multiVals = "first")
+```
+
+
+```{r}
+sigs.df <- data.frame(entrez = 1)
+sigs.df$ensembl <- mapIds(org.Hs.eg.db, keys = sigs.df$entrez, keytype = "ENTREZID", column = "ENSEMBL", multiVals = "first")
+
+
+```
+# Convert the GB_ACC from the training data to Entrez ID
+```{r}
+file_name <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Results/selected_features_001.csv"
+save_full_names <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Results/selected_features_001_mapp.csv"
+
+save_file_name <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Results/selected_features_001_ensembl.csv"
+df <- read.csv(file_name)
+
+```
+
+```{r}
+file_name <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Results/selected_genes_microarray.csv"
+save_full_names <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Results/selected_genes_microarray_mapp.csv"
+
+save_file_name <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Results/selected_genes_microarray_ensembl.csv"
+df <- read.csv(file_name)
+
+```
+
+
+```{r}
+file_name <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Results/frequent_GB_ACCs.csv"
+save_full_names <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Results/frequent_GB_ACCs_mapp.csv"
+
+save_file_name <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Results/frequent_GB_ACCs_ensembl.csv"
+df <- read.csv(file_name)
+
+```
+
+```{r}
+file_name <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Results/selected_features_287.csv"
+save_full_names <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Results/selected_features_287_mapp.csv"
+
+save_file_name <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning//Results/selected_features_287_ensembl.csv"
+df <- read.csv(file_name)
+
+```
+
+
+
+```{r}
+file_name <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Data/all_genes.csv"
+save_full_names <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Data/all_genes_mapp.csv"
+
+save_file_name <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Data/all_genes.csv"
+df <- read.csv(file_name)
+
+```
+
+
+```{r}
+file_name <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Results/Model_outputs/result32/selected_features.csv"
+save_full_names <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Results/Model_outputs/result32/selected_features_mapp.csv"
+
+save_file_name <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Results/Model_outputs/result32/selected_features_x.csv"
+df <- read.csv(file_name)
+
+```
+
+
+
+
+Convert gb_acc to entrezid
+```{r}
+gb_acc_2_entrezid <- function(value) {
+  result <- 0
+  tryCatch(
+    {
+      # Attempt to perform the reverse mapping
+      result <- get(value, revmap(org.Hs.egACCNUM))
+    },
+    error = function(e) {
+      # If an error occurs, return NULL
+      print(e)
+    }
+  )
+  return(result)
+}
+```
+
+```{r}
+gb_acc_2_entrezid("X79510")
+```
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+
+#df$entrez <- sapply(df$Final_selected, function(value) get(value, revmap(org.Hs.egACCNUM)))
+x = sapply(df$Genes, gb_acc_2_entrezid)
+```
+
+```{r}
+df$entrez = x
+df_2 <- df[df$entrez != 0, ]
+```
+
+```{r}
+entrez_list <- df$entrez[df$entrez != 0]
+entrez_list
+```
+
+
+Now convert the entrez to ensembl
+
+```{r}
+mapping <- mapIds(org.Hs.eg.db, keys = entrez_list, keytype = "ENTREZID", column = "ENSEMBL", multiVals = "first")
+mapping_list <- mapIds(org.Hs.eg.db, keys = entrez_list, keytype = "ENTREZID", column = "ENSEMBL", multiVals = "list")
+```
+```{r}
+all_strings <- list()
+
+# Iterate over each element in mapping_list
+for (element in mapping_list) {
+  # Extract the list of strings associated with the current element
+  string_list <- unlist(element)
+  
+  # Combine the current list of strings with the overall list of strings
+  all_strings <- c(all_strings, string_list)
+}
+
+all_ensembl = unlist(all_strings)
+```
+
+
+
+```{r}
+df_2$ensembl <- mapping
+```
+
+And see the result
+
+```{r}
+df_2
+```
+```{r}
+mapping <- mapIds(org.Hs.eg.db, keys = entrez_list, keytype = "ENTREZID", column = "SYMBOL", multiVals = "first")
+
+mapping_list <- mapIds(org.Hs.eg.db, keys = entrez_list, keytype = "ENTREZID", column = "SYMBOL", multiVals = "list")
+all_strings <- list()
+
+# Iterate over each element in mapping_list
+for (element in mapping_list) {
+  # Extract the list of strings associated with the current element
+  string_list <- unlist(element)
+  
+  # Combine the current list of strings with the overall list of strings
+  all_strings <- c(all_strings, string_list)
+}
+
+all_symbols = unlist(all_strings)
+df_2$symbol <- mapping
+
+```
+
+And save it
+
+```{r}
+write.csv(df_2, file = save_full_names, row.names = FALSE)
+
+all_ensembl <- data.frame(all_ensembl)
+
+write.csv(all_ensembl, file = save_file_name, row.names = FALSE)
+
+
+```
+
+
+

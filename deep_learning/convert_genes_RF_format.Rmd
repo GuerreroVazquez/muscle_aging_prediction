@@ -1,0 +1,237 @@
+---
+title: "Convert_gene_names"
+author: "Karen"
+date: "2024-04-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Libraries
+
+```{r}
+
+library("AnnotationDbi")
+library(org.Hs.eg.db)
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+#BiocManager::install("org.Hs.eg.db")
+```
+
+
+## Functions
+
+```{R}
+
+
+# Function to convert GB_ACC to Entrez ID
+gb_acc_2_entrezid <- function(value) {
+  result <- 0
+  tryCatch(
+    {
+      # Attempt to perform the reverse mapping
+      result <- get(value, revmap(org.Hs.egACCNUM))
+    },
+    error = function(e) {
+      # If an error occurs, return NULL
+      print(e)
+    }
+  )
+  return(result)
+}
+
+# Function to map Entrez ID to Ensembl ID
+map_entrez_to_ensembl <- function(entrez_list) {
+  print("Converting to ensmbl")
+  mapping <- mapIds(org.Hs.eg.db, keys = entrez_list, keytype = "ENTREZID", column = "ENSEMBL", multiVals = "first")
+  mapping_list <- mapIds(org.Hs.eg.db, keys = entrez_list, keytype = "ENTREZID", column = "ENSEMBL", multiVals = "list")
+  
+  all_strings <- list()
+  
+  # Iterate over each element in mapping_list
+  for (element in mapping_list) {
+    # Extract the list of strings associated with the current element
+    string_list <- unlist(element)
+    
+    # Combine the current list of strings with the overall list of strings
+    all_strings <- c(all_strings, string_list)
+  }
+  
+  all_ensembl <- unlist(all_strings)
+  return(list(mapping = mapping, all_ensembl = all_ensembl))
+}
+
+map_ensembl_to_symbol <- function(entrez_list) {
+  print("Converting to symbl")
+  mapping <- mapIds(org.Hs.eg.db, keys = entrez_list, keytype = "ENSEMBL", column = "SYMBOL", multiVals = "first")
+  mapping_list <- mapIds(org.Hs.eg.db, keys = entrez_list, keytype = "ENSEMBL", column = "SYMBOL", multiVals = "list")
+  
+  all_strings <- list()
+  
+  # Iterate over each element in mapping_list
+  for (element in mapping_list) {
+    # Extract the list of strings associated with the current element
+    string_list <- unlist(element)
+    
+    # Combine the current list of strings with the overall list of strings
+    all_strings <- c(all_strings, string_list)
+  }
+  
+  all_ensembl <- unlist(all_strings)
+  return(list(mapping = mapping, all_ensembl = all_ensembl))
+}
+
+# Function to map Entrez ID to symbol
+map_entrez_to_symbol <- function(entrez_list) {
+  mapping <- mapIds(org.Hs.eg.db, keys = entrez_list, keytype = "ENTREZID", column = "SYMBOL", multiVals = "first")
+  mapping_list <- mapIds(org.Hs.eg.db, keys = entrez_list, keytype = "ENTREZID", column = "SYMBOL", multiVals = "list")
+  
+  all_strings <- list()
+  
+  # Iterate over each element in mapping_list
+  for (element in mapping_list) {
+    # Extract the list of strings associated with the current element
+    string_list <- unlist(element)
+    
+    # Combine the current list of strings with the overall list of strings
+    all_strings <- c(all_strings, string_list)
+  }
+  
+  all_symbols <- unlist(all_strings)
+  return(list(mapping = mapping, all_symbols = all_symbols))
+}
+
+# Function to process file
+process_file <- function(file_name, save_full_names, save_file_name) {
+  df <- read.csv(file_name)
+  
+  # Convert GB_ACC to Entrez ID
+  x <- sapply(df$Genes, gb_acc_2_entrezid)
+  df$entrez <- x
+  df_2 <- df[df$entrez != 0, ]
+  
+  # Map Entrez ID to Ensembl ID
+  entrez_list <- df$entrez[df$entrez != 0]
+  mapping_result <- map_entrez_to_ensembl(entrez_list)
+  df_2$ensembl <- mapping_result$mapping
+  
+  # Map Entrez ID to symbol
+  symbol_mapping_result <- map_entrez_to_symbol(entrez_list)
+  df_2$symbol <- symbol_mapping_result$mapping
+  
+  # Write processed data to files
+  write.csv(df_2, file = save_full_names, row.names = FALSE)
+  
+  all_ensembl <- data.frame(mapping_result$all_ensembl)
+  write.csv(all_ensembl, file = save_file_name, row.names = FALSE)
+}
+
+
+
+```
+
+```{r}
+# Example usage
+file_name <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Results/selected_features_001.csv"
+save_full_names <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Results/selected_features_001_mapp.csv"
+save_file_name <- "/home/karen/Documents/GitHub/Identify_muscle_age_genes/deep_learning/Results/selected_features_001_ensembl.csv"
+
+process_file(file_name, save_full_names, save_file_name)
+
+```
+
+
+```{r}
+# Function to preprocess Ensembl IDs by removing version numbers
+preprocess_ensembl_ids <- function(ensembl_ids) {
+  # Remove version numbers (.X) from Ensembl IDs
+  cleaned_ids <- sub("\\..*$", "", ensembl_ids)
+  return(cleaned_ids)
+}
+
+# Modified function to process file and convert Ensembl IDs to gene symbols
+process_and_convert_symbols <- function(file_name, save_full_names, save_file_name) {
+  df <- read.csv(file_name, header = FALSE)  # Assuming no header in the file
+  
+  # Extract Ensembl IDs
+  ensembl_ids <- df[, 2]
+  
+  # Preprocess Ensembl IDs by removing version numbers
+  cleaned_ids <- preprocess_ensembl_ids(ensembl_ids)
+  
+  # Convert Ensembl IDs (without version numbers) to gene symbols
+  symbol_mapping_result <- map_ensembl_to_symbol(cleaned_ids)
+  df$symbol <- symbol_mapping_result$mapping
+  df <- apply(df,2,as.character)
+  # Write processed data to files with "_Symbols" appended to the original file name
+  write.csv(df, file = save_full_names, row.names = FALSE)
+}
+```
+
+```{r}
+
+
+# Modified function to process file and convert Ensembl IDs to gene symbols
+process_and_convert_GBACC_symbols <- function(file_name, save_full_names, save_file_name) {
+  df <- read.csv(file_name, header = TRUE)  # Assuming no header in the file
+  df <- df[abs(df$abs_coef) > 0.1, ]
+  x = sapply(df[, 1], gb_acc_2_entrezid)
+  df$entrez = x
+ 
+  df_2 <- df[df$entrez != 0, ]
+  entrez_list <- df_2$entrez[df$entrez != 0]
+  print("Mapping entrez")
+  if (length(entrez_list)<1)
+  {
+    print("No genes, exiting")
+    return ("NO genes to convert")
+  }
+  else
+    {
+      print("Looking for ")
+      print(length(entrez_list) )
+      print(entrez_list)
+  mapping <- mapIds(org.Hs.eg.db, keys = entrez_list, keytype = "ENTREZID", column = "ENSEMBL", multiVals = "first")
+  #mapping_list <- mapIds(org.Hs.eg.db, keys = entrez_list, keytype = "ENTREZID", column = "ENSEMBL", multiVals = "list")
+  df_2$ensembl <- mapping
+  ensembl_ids <- df_2$ensembl
+  # Extract Ensembl IDs
+  # Preprocess Ensembl IDs by removing version numbers
+  cleaned_ids <- preprocess_ensembl_ids(ensembl_ids)
+  # Convert Ensembl IDs (without version numbers) to gene symbols
+  symbol_mapping_result <- (cleaned_ids)
+  df_2$symbol <- symbol_mapping_result$mapping
+  df_2 <- apply(df_2,2,as.character)
+  names(df_2)[1] <- "GB_ACC"
+  print("Finish")
+  print(file_name)
+  # Write processed data to files with "_Symbols" appended to the original file name
+  write.csv(df_2, file = save_full_names, row.names = FALSE)
+  }
+}
+```
+
+```{r}
+# Directory containing CSV files
+directory <- "Results/feature_selection/RNAseq/random_forest_0"
+
+# List all CSV files in the directory
+files <- list.files(path = directory, pattern = "\\.csv$", full.names = TRUE)
+files
+
+```
+
+```{r}
+for (file in files) {
+  # Generate output file names with "_Symbols" appended
+  save_full_names <- paste0(tools::file_path_sans_ext(file), "_Symbols.csv")
+  save_file_name <- paste0(tools::file_path_sans_ext(file), "_Symbols_ensembl.csv")
+  
+  # Process the file and convert Ensembl IDs to gene symbols
+ process_and_convert_symbols(file, save_full_names, save_file_name)
+
+}
+```
+
